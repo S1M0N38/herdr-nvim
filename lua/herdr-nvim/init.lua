@@ -5,26 +5,12 @@ local agents = require("herdr-nvim.agents")
 local dispatch = require("herdr-nvim.dispatch")
 local ui = require("herdr-nvim.ui")
 
-M.config = { prefix = "<leader>a", keymaps = true, clear_after_send = true }
-
-local function map(mode, lhs, rhs, desc)
-  if vim.fn.maparg(vim.api.nvim_replace_termcodes(lhs, true, true, true), mode) ~= "" then
-    vim.notify("herdr-nvim: not overriding existing map " .. lhs, vim.log.levels.WARN)
-    return
-  end
-  vim.keymap.set(mode, lhs, rhs, { desc = desc })
-end
+M.config = { clear_after_send = true }
 
 function M.setup(config)
   M.config = vim.tbl_deep_extend("force", M.config, config or {})
-  if M.config.keymaps then
-    local p = M.config.prefix
-    map("x", p .. "c", function() M.comment_selection() end, "herdr-nvim: comment selection")
-    map("n", p .. "c", function() M.comment_line() end, "herdr-nvim: comment line")
-    map("n", p .. "l", function() M.list_comments() end, "herdr-nvim: list comments")
-    map("n", p .. "s", function() M.send_all({ submit = false }) end, "herdr-nvim: paste comments to agent")
-    map("n", p .. "S", function() M.send_all({ submit = true }) end, "herdr-nvim: send comments to agent")
-  end
+  -- Ensure :Herdr is registered (also done from plugin/herdr-nvim.lua).
+  require("herdr-nvim.commands").register()
 end
 
 local function add_comment(start_line, end_line)
@@ -35,15 +21,20 @@ local function add_comment(start_line, end_line)
   end)
 end
 
+-- Range primitive behind comment_line(), comment_selection(), and :Herdr comment.
+function M.comment_range(start_line, end_line)
+  add_comment(start_line, end_line)
+end
+
 function M.comment_selection()
   vim.cmd([[execute "normal! \<esc>"]]) -- materialize '< '> marks
   local s, e = ui.visual_range()
-  add_comment(s, e)
+  M.comment_range(s, e)
 end
 
 function M.comment_line()
   local l = vim.api.nvim_win_get_cursor(0)[1]
-  add_comment(l, l)
+  M.comment_range(l, l)
 end
 
 -- Edit a comment's text in place (undecorate → edit → re-decorate so the callout
